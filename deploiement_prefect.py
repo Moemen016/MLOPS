@@ -1,21 +1,41 @@
 """Étape 05 - Déploiements Prefect planifiés."""
 
 from prefect import serve
+from prefect.schedules import Cron
 
-from pipeline_prefect import all_flow, train_flow, evaluate_flow, install_flow, code_flow
+from pipeline_prefect import (
+    all_flow,
+    train_flow,
+    evaluate_flow,
+    install_flow,
+    code_flow,
+    predict_flow,
+)
+
+TZ = "Africa/Tunis"
 
 if __name__ == "__main__":
-    # Names match the handout: prefect deployment run 'all/ml-pipeline-all'
     serve(
+        # Full pipeline: every night at 2am
         all_flow.to_deployment(
             name="ml-pipeline-all",
-            cron="0 2 * * *",  # every day at 02:00
+            schedule=Cron("0 2 * * *", timezone=TZ),
             tags=["full-pipeline", "mlops"],
         ),
-        train_flow.to_deployment(name="ml-pipeline-train", tags=["training", "mlops"]),
-        evaluate_flow.to_deployment(
-            name="ml-pipeline-evaluate", tags=["evaluation", "mlops"]
+        # Retraining: every Monday at 3am
+        train_flow.to_deployment(
+            name="ml-pipeline-train",
+            schedule=Cron("0 3 * * 1", timezone=TZ),
+            tags=["training", "mlops"],
         ),
+        # Prediction: every hour
+        predict_flow.to_deployment(
+            name="ml-pipeline-predict",
+            schedule=Cron("0 * * * *", timezone=TZ),
+            tags=["prediction", "mlops"],
+        ),
+        # Manual only
+        evaluate_flow.to_deployment(name="ml-pipeline-evaluate", tags=["evaluation", "mlops"]),
         install_flow.to_deployment(name="ml-pipeline-install", tags=["setup", "mlops"]),
         code_flow.to_deployment(name="ml-pipeline-code", tags=["code", "mlops"]),
     )

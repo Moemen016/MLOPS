@@ -1,5 +1,4 @@
 """Atelier 3 - Pipeline MLOps avec Prefect."""
-
 # pylint: disable=missing-function-docstring
 
 import argparse
@@ -14,6 +13,7 @@ from model_pipeline import (
     save_model,
     load_model,
     evaluate_model,
+    predict,
 )
 
 # Only scan our own files (otherwise flake8/pylint/bandit scan the whole venv)
@@ -36,7 +36,12 @@ def run_cmd(cmd, check=True):
     return result.returncode
 
 
-# ----------------------------------------------------------------- TASKS (env)
+# ------------------------------------------------------------- TASKS (env)
+@task(name="Fetch project (git pull)")
+def fetch_project():
+    run_cmd(["git", "pull", "--ff-only"], check=False)
+
+
 @task(name="Install dependencies")
 def install_dependencies():
     run_cmd([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
@@ -99,6 +104,14 @@ def evaluate_model_task(model, data):
     return accuracy
 
 
+@task(name="Predict")
+def predict_task(data):
+    _x_train, x_test, _y_train, _y_test = data
+    predictions = predict(x_test)
+    get_run_logger().info("First 10 predictions: %s", predictions[:10])
+    return predictions
+
+
 # ----------------------------------------------------------------------- FLOWS
 @flow(name="install")
 def install_flow():
@@ -127,8 +140,15 @@ def evaluate_flow():
     evaluate_model_task(model, data)
 
 
+@flow(name="predict")
+def predict_flow():
+    data = prepare_data_task()
+    predict_task(data)
+
+
 @flow(name="all")
 def all_flow():
+    fetch_project()
     install_dependencies()
     format_code()
     code_quality()
@@ -146,6 +166,7 @@ FLOWS = {
     "train": train_flow,
     "entrainement": train_flow,  # alias used in the handout
     "evaluate": evaluate_flow,
+    "predict": predict_flow,
     "all": all_flow,
 }
 
