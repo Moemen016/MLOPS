@@ -1,0 +1,6 @@
+prefect
+black
+flake8
+pylint
+bandit
+pytest
